@@ -72,16 +72,16 @@ class IterBasedRunner(BaseRunner):
         self.model.eval()
         self.mode = 'val'
         self.data_loader = data_loader
-        data_batch = next(data_loader)
-        self.call_hook('before_val_iter')
-        outputs = self.model.val_step(data_batch, **kwargs)
-        if not isinstance(outputs, dict):
-            raise TypeError('model.val_step() must return a dict')
-        if 'log_vars' in outputs:
-            self.log_buffer.update(outputs['log_vars'], outputs['num_samples'])
-        self.outputs = outputs
-        self.call_hook('after_val_iter')
-        self._inner_iter += 1
+        for data_batch in data_loader:
+            self.call_hook('before_val_iter')
+            outputs = self.model.val_step(data_batch, self.optimizer, **kwargs)
+            if not isinstance(outputs, dict):
+                raise TypeError('model.val_step() must return a dict')
+            if 'log_vars' in outputs:
+                self.log_buffer.update(outputs['log_vars'], outputs['num_samples'])
+            self.outputs = outputs
+            self._inner_iter += 1
+        self.call_hook('after_val_epoch')
 
     def run(self, data_loaders, workflow, max_iters=None, **kwargs):
         """Start running.
@@ -112,7 +112,7 @@ class IterBasedRunner(BaseRunner):
                          self._max_iters)
         self.call_hook('before_run')
 
-        iter_loaders = [IterLoader(x) for x in data_loaders]
+        iter_loaders = [IterLoader(x) if workflow[i][0] != 'val' else x for i,x in enumerate(data_loaders)]
 
         self.call_hook('before_epoch')
 
